@@ -26,6 +26,7 @@ export class UploadComponent implements OnDestroy{
   percentageCompleted = 0;
   user: firebase.User | null = null;
   task?: AngularFireUploadTask;
+  screenshots: string[] = [];
 
   title = new FormControl('', [
     Validators.required,
@@ -42,7 +43,10 @@ export class UploadComponent implements OnDestroy{
     ffmpegService.init(); // disable form until ffmpeg to load
   }
 
-  storeFile($event: Event) {
+  async storeFile($event: Event) {
+    if(this.ffmpegService.isRunning) {
+      return;
+    }
     this.isDragOver = false;
 
     // Drag and drop, input type="file"
@@ -53,6 +57,8 @@ export class UploadComponent implements OnDestroy{
     if (!this.file || this.file.type !== 'video/mp4') {
       return;
     }
+
+    this.screenshots = await this.ffmpegService.generateScreenShots(this.file);
 
     this.title.setValue(this.file.name.replace(/\.[^/.]+$/, '')); // rmove extenson from file
     this.nextStep = true;
