@@ -7,6 +7,7 @@ import { AngularFireAuth } from '@angular/fire/compat/auth';
 import firebase from 'firebase/compat/app'; // interface
 import { ClipService } from 'src/app/services/clip.service';
 import { Router } from '@angular/router';
+import { FfmpegService } from 'src/app/services/ffmpeg.service';
 
 @Component({
   selector: 'app-upload',
@@ -35,8 +36,10 @@ export class UploadComponent implements OnDestroy{
   })
 
   constructor(private storage: AngularFireStorage, protected afAuth: AngularFireAuth,
-    private clipService: ClipService, private router: Router) {
+    private clipService: ClipService, private router: Router,
+    public ffmpegService: FfmpegService) {
     afAuth.user.subscribe(user => this.user = user);
+    ffmpegService.init(); // disable form until ffmpeg to load
   }
 
   storeFile($event: Event) {
