@@ -99,6 +99,14 @@ export class ClipService {
 
       query = query.startAfter(lastDoc);
     }
+
+    const snapshot = await query.get();
+    snapshot.forEach(doc => {
+      this.pageClips.push({
+        docID: doc.id,
+        ...doc.data()
+      })
+    })
     this.pendingReq = false;
   }
 }
