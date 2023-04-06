@@ -8,6 +8,7 @@ import firebase from 'firebase/compat/app'; // interface
 import { ClipService } from 'src/app/services/clip.service';
 import { Router } from '@angular/router';
 import { FfmpegService } from 'src/app/services/ffmpeg.service';
+import { combineLatest, forkJoin } from 'rxjs';
 
 @Component({
   selector: 'app-upload',
@@ -27,6 +28,8 @@ export class UploadComponent implements OnDestroy{
   user: firebase.User | null = null;
   task?: AngularFireUploadTask;
   screenshots: string[] = [];
+  selectedScreenShot = '';
+  screenshotTask?: AngularFireUploadTask;
 
   title = new FormControl('', [
     Validators.required,
@@ -59,13 +62,14 @@ export class UploadComponent implements OnDestroy{
     }
 
     this.screenshots = await this.ffmpegService.generateScreenShots(this.file);
+    this.selectedScreenShot = this.screenshots[0];
 
     this.title.setValue(this.file.name.replace(/\.[^/.]+$/, '')); // rmove extenson from file
     this.nextStep = true;
     console.log(this.file)
   }
 
-  uploadFile() {
+  async uploadFile() { // blobFromUrl - async method
     this.uploadForm.disable();
     this.showAlert = true;
     this.alertMsg = "Please wait! your clip is being uploded";
@@ -74,27 +78,58 @@ export class UploadComponent implements OnDestroy{
 
     const clipFileName = uuid(); // firebase overwrite duplicate file name, so uuid is used
     const clipPath = `clips-lg/${clipFileName}.mp4`;
+
+    const screenShotBlob = await this.ffmpegService.blobFromUrl(this.selectedScreenShot);
+    const screenshotPath = `screenshots/${clipFileName}.png`;
+
     this.task = this.storage.upload(clipPath, this.file);
     const clipRef = this.storage.ref(clipPath);
-    this.task.percentageChanges().subscribe(percent => {
-      this.percentageCompleted = percent as number / 100;
+
+    this.screenshotTask =  this.storage.upload(screenshotPath, screenShotBlob); // upload image to store
+
+    const screenshotRef = this.storage.ref(screenshotPath);
+
+    // Get percentage from both video and file upload
+    combineLatest([
+      this.task.percentageChanges(),
+      this.screenshotTask.percentageChanges()
+    ])
+    .subscribe(progress => {
+      const [clipProgress, screenshotProgress] = progress;
+      if(!clipProgress || !screenshotProgress) {
+        return
+      }
+
+      const total = clipProgress + screenshotProgress;
+      this.percentageCompleted = total as number / 200;
     })
 
-    // Get document reference to diplay the uploaded video
-    this.task.snapshotChanges().pipe(
-      last(),
-      switchMap(() => clipRef.getDownloadURL())
+    // Progress only for video
+    // this.task.percentageChanges().subscribe(percent => {
+    //   this.percentageCompleted = percent as number / 100;
+    // })
+
+    // Implement forkjoin to save both video and selected screenshot url
+    // And also save data after coompleting both api calls
+    forkJoin([this.task.snapshotChanges(),
+    this.screenshotTask.snapshotChanges()]).pipe(
+      //last(), // forkjoin return after coompleting process
+      switchMap(() => forkJoin([clipRef.getDownloadURL(),
+      screenshotRef.getDownloadURL()]))
     ).subscribe({
       // next: (snapshot) => { // last snapshot return
-      next: async (url) => { // after switchMap, inner subscribe return url but it also after video upload
+      next: async (urls) => { // after switchMap, inner subscribe return url but it also after video upload
         this.alertMsg = "Success! Your clip is ready to share";
         this.alertColor = "green";
+
+        const [clipUrl, screenshotUrl] = urls;
         const clip = {
           uid: this.user?.uid as string,
           displayName: this.user?.displayName as string,
           title: this.title.value as string,
           fileName: `${clipFileName}.mp4`,
-          url,
+          url: clipUrl,
+          screenshotUrl,
           timeStamp: firebase.firestore.FieldValue.serverTimestamp()
         }
         const clipDocRef = await this.clipService.createClip(clip);
@@ -112,6 +147,39 @@ export class UploadComponent implements OnDestroy{
         // Using errorCode to display proper msg if required
       }
     })
+
+    // Get document reference to diplay the uploaded video
+    // this.task.snapshotChanges().pipe(
+    //   last(),
+    //   switchMap(() => clipRef.getDownloadURL())
+    // ).subscribe({
+    //   // next: (snapshot) => { // last snapshot return
+    //   next: async (url) => { // after switchMap, inner subscribe return url but it also after video upload
+    //     this.alertMsg = "Success! Your clip is ready to share";
+    //     this.alertColor = "green";
+    //     const clip = {
+    //       uid: this.user?.uid as string,
+    //       displayName: this.user?.displayName as string,
+    //       title: this.title.value as string,
+    //       fileName: `${clipFileName}.mp4`,
+    //       url,
+    //       timeStamp: firebase.firestore.FieldValue.serverTimestamp()
+    //     }
+    //     const clipDocRef = await this.clipService.createClip(clip);
+    //     setTimeout(() => {
+    //       this.router.navigate(
+    //         ['clip', clipDocRef.id]
+    //       )
+    //     }, 1000);
+    //   },
+    //   error: (error) => {
+    //     this.uploadForm.enable();
+    //     this.alertColor = 'red';
+    //     this.alertMsg = 'Upload failed! Please try again later';
+    //     this.inSubmission = true;
+    //     // Using errorCode to display proper msg if required
+    //   }
+    // })
     
     // this.task.snapshotChanges().pipe(
     //   last(),
