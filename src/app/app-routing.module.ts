@@ -15,7 +15,7 @@ const routes: Routes = [
     component: AboutComponent
   },
   {
-    path: 'clip/:id',
+    path: 'clips/:id',
     component: ClipsComponent
   },
   {
