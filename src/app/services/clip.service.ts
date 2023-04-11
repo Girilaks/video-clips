@@ -1,21 +1,24 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { AngularFirestore, AngularFirestoreCollection, DocumentReference, QuerySnapshot } from '@angular/fire/compat/firestore';
 import { IClip } from '../models/clip.model';
 import { AngularFireAuth } from '@angular/fire/compat/auth';
 import { switchMap, map } from 'rxjs/operators';
 import { of, BehaviorSubject, combineLatest } from 'rxjs';
 import { AngularFireStorage } from '@angular/fire/compat/storage';
+//import { Resolve } from '@angular/router';
+import { Router, ActivatedRouteSnapshot, ResolveFn, RouterStateSnapshot } from '@angular/router';
 
 @Injectable({
   providedIn: 'root'
 })
-export class ClipService {
+//export class ClipService  implements Resolve<IClip | null>{
+  export class ClipService {
   public clipCollection: AngularFirestoreCollection<IClip>;
   pageClips: IClip[] = [];
   pendingReq = false;
 
   constructor(private db: AngularFirestore, private afAuth: AngularFireAuth,
-    private storage: AngularFireStorage) {
+    private storage: AngularFireStorage, private router: Router) {
     this.clipCollection = db.collection('clips');
   }
 
@@ -109,4 +112,49 @@ export class ClipService {
     })
     this.pendingReq = false;
   }
+
+  // resolve(route: ActivatedRouteSnapshot, state: RouterStateSnapshot) {
+  //   return this.clipCollection.doc(route.params.id)
+  //     .get()
+  //     .pipe(
+  //       map(
+  //         snapshot => {
+  //           const data = snapshot.data();
+  //           if (!data) {
+  //             this.router.navigate(['/']);
+  //             return null;
+  //           }
+  //           return data;
+  //         }
+  //       )
+  //     )
+  // }
+
+  getClipByID(id: string | null) {
+    if (!id) {
+      this.router.navigate(['/']);
+      return null;
+    }
+    return this.clipCollection.doc(id)
+      .get()
+      .pipe(
+        map(
+          snapshot => {
+            const data = snapshot.data();
+            if (!data) {
+              this.router.navigate(['/']);
+              return null;
+            }
+            return data;
+          }
+        )
+      )
+  }
 }
+
+export const clipReslover: ResolveFn<IClip | null> = 
+(route: ActivatedRouteSnapshot, state: RouterStateSnapshot) => {
+  return inject(ClipService).getClipByID(route.paramMap.get('id'))
+};
+
+

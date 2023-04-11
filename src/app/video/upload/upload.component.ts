@@ -135,7 +135,7 @@ export class UploadComponent implements OnDestroy{
         const clipDocRef = await this.clipService.createClip(clip);
         setTimeout(() => {
           this.router.navigate(
-            ['clip', clipDocRef.id]
+            ['clips', clipDocRef.id]
           )
         }, 1000);
       },

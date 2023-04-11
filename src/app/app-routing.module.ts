@@ -4,6 +4,7 @@ import { AboutComponent } from './about/about.component';
 import { ClipsComponent } from './clips/clips.component';
 import { HomeComponent } from './home/home.component';
 import { NotFoundComponent } from './not-found/not-found.component';
+import { ClipService, clipReslover } from './services/clip.service';
 
 const routes: Routes = [
   {
@@ -16,7 +17,10 @@ const routes: Routes = [
   },
   {
     path: 'clips/:id',
-    component: ClipsComponent
+    component: ClipsComponent,
+    resolve: {
+      clip: clipReslover
+    }
   },
   {
     path: '**',
